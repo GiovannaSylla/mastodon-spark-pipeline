@@ -1,0 +1,45 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.9.4.arm64
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.9.4.arm64
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"    # pour les autres conteneurs
+      - "29092:29092"  # pour ta machine (localhost)
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+  spark:
+    image: apache/spark:3.5.2
+    container_name: docker-spark-master
+    command: ["/bin/bash","-lc","/opt/spark/sbin/start-master.sh -h spark && tail -f /dev/null"]
+    environment:
+      - SPARK_HOME=/opt/spark
+    ports:
+      - "18080:8080"  
+      - "7077:7077"   
+    depends_on:
+      - kafka
+    volumes:
+      - ../spark:/app  
+
+  spark-worker:
+    image: apache/spark:3.5.2
+    container_name: docker-spark-worker-1
+    command: ["/bin/bash","-lc","/opt/spark/sbin/start-worker.sh spark://spark:7077 && tail -f /dev/null"]
+    environment:
+      - SPARK_HOME=/opt/spark
+    depends_on:
+      - spark
