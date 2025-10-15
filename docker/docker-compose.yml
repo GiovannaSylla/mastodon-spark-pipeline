@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.9.4.arm64
@@ -12,8 +14,8 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"    # pour les autres conteneurs
-      - "29092:29092"  # pour ta machine (localhost)
+      - "9092:9092"     
+      - "29092:29092"   
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
@@ -21,19 +23,22 @@ services:
       KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092"
       KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
   spark:
     image: apache/spark:3.5.2
     container_name: docker-spark-master
     command: ["/bin/bash","-lc","/opt/spark/sbin/start-master.sh -h spark && tail -f /dev/null"]
     environment:
-      - SPARK_HOME=/opt/spark
+    - IVY_HOME=/tmp/.ivy2
+    - SPARK_SUBMIT_OPTS=-Dspark.jars.ivy=/tmp/.ivy2
     ports:
-      - "18080:8080"  
-      - "7077:7077"   
+      - "18080:8080"
+      - "7077:7077"
     depends_on:
       - kafka
     volumes:
-      - ../spark:/app  
+      - ../spark:/app
+      
 
   spark-worker:
     image: apache/spark:3.5.2
@@ -43,3 +48,38 @@ services:
       - SPARK_HOME=/opt/spark
     depends_on:
       - spark
+
+  producer:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ../producer:/app:ro
+    env_file:
+      - ../.env
+    environment:
+      KAFKA_BROKER: kafka:9092
+      KAFKA_TOPIC: mastodon_stream
+    depends_on:
+      - kafka
+    command: >
+      bash -lc "pip install --no-cache-dir -r requirements.txt &&
+                python -u /app/mastodon_producer.py"
+
+  postgres:
+    image: postgres:15
+    container_name: docker-postgres-1
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
