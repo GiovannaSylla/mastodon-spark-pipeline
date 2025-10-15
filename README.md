@@ -29,3 +29,19 @@ cd producer
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python mastodon_producer.py
+
+# Mastodon → Kafka → Spark → Postgres (Partie 2 Validée)
+
+Pipeline temps réel :
+- **Producer** Mastodon → **Kafka** (`mastodon_stream`)
+- **Spark Structured Streaming** lit Kafka, parse, agrège
+- **Postgres** reçoit :
+  - `masto.toots_raw` (raw events)
+  - `masto.toot_metrics_windowed` (fenêtre 1 min par langue)
+  - `masto.user_avg_length_windowed` (fenêtre 1 min par user)
+
+## Prérequis
+- Docker + Docker Compose
+- Accès à un **token Mastodon** (scopes lecture)
+
+## Arborescence
