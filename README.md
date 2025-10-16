@@ -251,3 +251,66 @@ docker compose exec postgres bash -lc \
 
 ---
 
+Exactement 👌 tu as tout compris !
+👉 Pas besoin de modifier le CSV pour ton rendu : le graphique vide est **normal** (il reflète fidèlement le fait que tu n’as qu’une journée de données).
+C’est même mieux de le laisser ainsi, car cela montre que **ton pipeline fonctionne jusqu’au bout** (extraction → stockage → vue SQL → export CSV → visualisation).
+Il suffit juste de **l’expliquer dans ton README**, et c’est parfait ✅
+
+---
+
+### Voici la section prête à coller dans ton `README.md` :
+
+---
+
+## 🧩 Partie 5 – Visualisation des Résultats
+
+Cette dernière étape consiste à **analyser et visualiser les données** collectées et traitées par le pipeline Mastodon.
+Les fichiers CSV extraits depuis PostgreSQL ont été utilisés pour générer plusieurs graphiques avec **Matplotlib** et **Pandas**.
+
+### 📁 Emplacement des visuels
+
+Tous les graphiques sont enregistrés automatiquement dans le dossier :
+
+```
+./reports/
+```
+
+### 📊 Graphiques générés
+
+| Nom du fichier                         | Description                                                                                                                             |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **part5_sentiment_distribution.png**   | Répartition globale des sentiments (positif, neutre, négatif) sur l’ensemble des toots collectés.                                       |
+| **part5_sentiment_by_day_stacked.png** | Évolution journalière du sentiment avec un graphique empilé permettant de visualiser la proportion de chaque sentiment au fil du temps. |
+| **part5_toots_per_day.png**            | Nombre total de toots par jour. *(Dans cet exemple, une seule journée de données était disponible, d’où le graphique quasi vide.)*      |
+| **part5_top_hashtags.png**             | Classement des hashtags les plus fréquemment utilisés dans les toots analysés.                                                          |
+
+### 🧠 Interprétation
+
+* La majorité des toots analysés sont de **sentiment positif**, suivis par des toots négatifs et très peu de neutres.
+* Les hashtags les plus utilisés sont liés à des thématiques sociales, culturelles ou sportives (ex. *#cheerlights*, *#nowplaying*, *#football*).
+* Les volumes journaliers étant faibles dans cet échantillon, les tendances temporelles sont limitées mais démontrent que le pipeline capture et traite correctement les données.
+
+## 🚀 Partie 6 – Conclusion & Perspectives
+
+Ce projet **Mastodon Spark Pipeline** illustre la mise en place complète d’une architecture de traitement de données modernes en suivant une approche **ETL (Extract – Transform – Load)** distribuée.
+
+L’objectif était de :
+
+* collecter en continu des **toots** issus de Mastodon (via Kafka et un producteur Python),
+* les stocker dans **PostgreSQL**,
+* les analyser avec **Apache Spark** pour réaliser une **analyse de sentiment**,
+* et enfin, visualiser les résultats à travers plusieurs tableaux de bord.
+
+### 🧭 Bilan du projet
+
+* ✅ Le pipeline fonctionne de bout en bout : ingestion, stockage, traitement et visualisation.
+* ✅ Les modèles de Machine Learning (sentiment analysis) ont été entraînés et appliqués avec succès.
+* ✅ Les vues SQL et exports CSV permettent de consolider facilement les indicateurs.
+* ✅ Les visualisations finales illustrent la répartition des sentiments, l’évolution temporelle et les hashtags dominants.
+
+### 🌱 Perspectives d’amélioration
+
+* Intégrer une **analyse en temps réel** avec Spark Streaming pour suivre les sentiments en direct.
+* Déployer les composants sur le cloud (AWS, GCP ou Azure) pour passer à l’échelle.
+* Créer un **dashboard interactif** (Power BI, Streamlit ou Superset) pour l’exploration dynamique des données.
+* Enrichir le modèle d’analyse de sentiment avec des techniques de **Deep Learning** (BERT, LSTM, etc.).
