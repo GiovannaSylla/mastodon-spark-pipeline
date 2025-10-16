@@ -62,6 +62,20 @@ The following tables are generated:
 
 ##  Part 2 — Batch Processing with Spark
 
+## Spark Web UI Access
+
+Once the Spark container is running, you can access the Spark Web UI in your browser to monitor jobs, stages, and executors.
+
+- **Spark Master UI:**  
+  [http://localhost:8080](http://localhost:8080)
+
+- **Spark Worker / Jobs UI:**  
+  [http://localhost:4040](http://localhost:4040)
+
+> ℹ️ The Spark UI shows real-time metrics, DAGs, and execution details of the streaming and batch jobs.  
+> This interface is automatically accessible when the Spark container is up via Docker Compose.
+
+
 To perform deeper analyses, batch jobs are scheduled to compute aggregate metrics from the raw data.
 
 ```bash
