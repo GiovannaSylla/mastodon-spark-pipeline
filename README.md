@@ -284,6 +284,39 @@ This **Mastodon Spark Pipeline** demonstrates a modern **distributed ETL archite
 * Upgrade to **deep learning models** (e.g., BERT or LSTM) for better accuracy
 
 ---
+##  Quick Start Guide
+
+To reproduce the full Mastodon → Kafka → Spark → PostgreSQL → Visualization pipeline:
+
+```bash
+# 1. Start the infrastructure
+cd docker
+docker compose up -d
+
+# 2. Create Kafka topics (once)
+docker compose exec kafka bash -lc "kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic mastodon_stream --replication-factor 1 --partitions 1"
+docker compose exec kafka bash -lc "kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic mastodon_errors --replication-factor 1 --partitions 1"
+
+# 3. Start the Mastodon producer
+cd ../producer
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+python mastodon_producer.py
+
+# 4. Run Spark Streaming to process and store toots
+cd ../docker
+docker compose exec spark bash -lc '/opt/spark/bin/spark-submit \
+  --master spark://spark:7077 \
+  --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0,org.postgresql:postgresql:42.7.4 \
+  /app/streaming_job.py'
+
+# 5. Run batch processing and sentiment analysis (optional)
+docker compose exec spark bash -lc '/opt/spark/bin/spark-submit --master spark://spark:7077 /app/batch_job.py'
+docker compose exec spark bash -lc '/opt/spark/bin/spark-submit --master spark://spark:7077 /app/sentiment_batch_predict.py'
+
+# 6. Generate visualizations
+python app/viz_part5.py
+
 
 ##  Author
 
