@@ -38,6 +38,7 @@ services:
       - kafka
     volumes:
       - ../spark:/app
+      - ../data:/data:rw
       
 
   spark-worker:
@@ -48,6 +49,8 @@ services:
       - SPARK_HOME=/opt/spark
     depends_on:
       - spark
+    volumes:
+      - ../data:/data:rw  
 
   producer:
     image: python:3.11-slim

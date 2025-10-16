@@ -97,5 +97,5 @@ by_lang_per_day = (df.groupBy("day", "lang")
 # On peut optimiser l’écriture par clé logique :
 write_pg(by_lang_per_day.repartition("day").coalesce(4), "masto.batch_toots_by_lang_per_day")
 
-print("✅ Batch terminé.")
+print("Batch terminé.")
 spark.stop()
