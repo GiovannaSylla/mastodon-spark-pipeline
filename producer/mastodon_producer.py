@@ -12,7 +12,6 @@ load_dotenv()
 BASE_URL = os.getenv("MASTODON_BASE_URL", "https://mastodon.social")
 ACCESS_TOKEN = os.getenv("MASTODON_ACCESS_TOKEN")
 
-# ✅ Correction ici : utiliser kafka:9092 par défaut dans Docker (pas localhost)
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
 TOPIC = os.getenv("KAFKA_TOPIC", "mastodon_stream")
 ERR_TOPIC = "mastodon_errors"
@@ -29,7 +28,7 @@ LANGS = [
 ]
 
 if not ACCESS_TOKEN:
-    print("❌ Missing MASTODON_ACCESS_TOKEN in .env", file=sys.stderr)
+    print("Missing MASTODON_ACCESS_TOKEN in .env", file=sys.stderr)
     sys.exit(1)
 
 # ---------------------- OUTILS ----------------------
@@ -45,9 +44,9 @@ def strip_html(text: str) -> str:
 # ✅ Initialisation du producteur Kafka (avec la bonne variable)
 try:
     producer = Producer({"bootstrap.servers": KAFKA_BOOTSTRAP})
-    print(f"✅ Connected to Kafka broker at {KAFKA_BOOTSTRAP}")
+    print(f"Connected to Kafka broker at {KAFKA_BOOTSTRAP}")
 except Exception as e:
-    print(f"❌ Failed to connect to Kafka: {e}", file=sys.stderr)
+    print(f"Failed to connect to Kafka: {e}", file=sys.stderr)
     sys.exit(1)
 
 def send(topic: str, doc: dict):
@@ -56,7 +55,7 @@ def send(topic: str, doc: dict):
         producer.produce(topic, json.dumps(doc).encode("utf-8"))
         producer.poll(0)  # non bloquant
     except Exception as e:
-        print(f"⚠️ Kafka produce error: {e}")
+        print(f"Kafka produce error: {e}")
         try:
             producer.produce(ERR_TOPIC, json.dumps({"error": str(e)}).encode("utf-8"))
             producer.poll(0)

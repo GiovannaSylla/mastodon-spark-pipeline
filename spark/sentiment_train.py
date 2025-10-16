@@ -73,6 +73,6 @@ print("F1:", mc_f1.evaluate(pred))
 
 # 6) Save model
 model.write().overwrite().save(MODEL_DIR)
-print(f"✅ Modèle enregistré dans {MODEL_DIR}")
+print(f"Modèle enregistré dans {MODEL_DIR}")
 
 spark.stop()

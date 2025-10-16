@@ -32,7 +32,7 @@ plt.tight_layout()
 plt.savefig(OUT / "part5_toots_per_day.png")
 plt.close()
 
-# Stacked bars sentiments par jour (optionnel mais joli)
+# Stacked bars sentiments par jour 
 plt.figure()
 width = 0.8
 plt.bar(daily["day"], daily["n_pos"], width, label="Positif")
@@ -49,7 +49,7 @@ plt.close()
 
 # --- 3) Top hashtags (horizontal bar chart) ---
 tags = pd.read_csv(DATA / "viz_top_hashtags.csv")
-tags = tags.sort_values("n", ascending=True)  # pour un barh du plus petit au plus grand
+tags = tags.sort_values("n", ascending=True)  
 plt.figure(figsize=(8, max(4, len(tags)*0.25)))
 plt.barh(tags["hashtag"], tags["n"])
 plt.title("Top hashtags")
@@ -59,6 +59,6 @@ plt.tight_layout()
 plt.savefig(OUT / "part5_top_hashtags.png")
 plt.close()
 
-print("✅ Graphes écrits dans ./reports :")
+print("Graphes écrits dans ./reports :")
 for p in sorted(OUT.glob("part5_*.png")):
     print(" -", p)

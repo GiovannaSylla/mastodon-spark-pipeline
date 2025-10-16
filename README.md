@@ -1,52 +1,70 @@
 # Mastodon Spark Pipeline
 
-Projet data streaming : **Mastodon → Kafka → Spark → PostgreSQL → Visualisations**.
+Data streaming project: **Mastodon → Kafka → Spark → PostgreSQL → Visualization**
 
-## Part 1 — Ingestion temps réel (Mastodon → Kafka)
+This project demonstrates a **complete end-to-end data processing pipeline** combining real-time ingestion, batch processing, machine learning–based sentiment analysis, and visual analytics.
 
-### Prérequis
-- Docker Desktop (Mac/ARM OK)
-- Token Mastodon (créez une app sur https://mastodon.social)
-- Python 3.10+ (pour le producer local)
-- Kafka topics: `mastodon_stream` & `mastodon_errors`
+---
 
-### Démarrage
+## Part 1 — Real-Time Ingestion (Mastodon → Kafka)
+
+### Requirements
+
+* Docker Desktop (compatible with Mac/ARM)
+* Python 3.10+
+* A Mastodon access token (create one at [mastodon.social](https://mastodon.social))
+* Kafka topics: `mastodon_stream`, `mastodon_errors`
+
+---
+
+###  Setup & Execution
+
 ```bash
-# 1) Kafka & Zookeeper
+# 1️⃣ Start Kafka and Zookeeper
 cd docker
 docker compose up -d
 
-# 2) Topics
+# 2️⃣ Create required topics
 docker compose exec kafka bash -lc "kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic mastodon_stream --replication-factor 1 --partitions 1"
 docker compose exec kafka bash -lc "kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic mastodon_errors --replication-factor 1 --partitions 1"
 
-# 3) Config env
+# 3️⃣ Environment configuration
 cd ..
-cp .env.example .env   # puis mettre MASTODON_ACCESS_TOKEN
+cp .env.example .env   # then set your MASTODON_ACCESS_TOKEN
 
-# 4) Producer
+# 4️⃣ Run the Mastodon producer
 cd producer
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 python mastodon_producer.py
+```
 
-# Mastodon → Kafka → Spark → Postgres (Partie 2 Validée)
+✅ Once running, Mastodon data flows from **Producer → Kafka → Spark → PostgreSQL**.
 
-Pipeline temps réel :
-- **Producer** Mastodon → **Kafka** (`mastodon_stream`)
-- **Spark Structured Streaming** lit Kafka, parse, agrège
-- **Postgres** reçoit :
-  - `masto.toots_raw` (raw events)
-  - `masto.toot_metrics_windowed` (fenêtre 1 min par langue)
-  - `masto.user_avg_length_windowed` (fenêtre 1 min par user)
+---
 
-## Prérequis
-- Docker + Docker Compose
-- Accès à un **token Mastodon** (scopes lecture)
+###  Real-Time Pipeline Overview
 
-## Arborescence
-Batch Processing (Partie 3)
-Lancer le job
+| Component                      | Description                                                |
+| ------------------------------ | ---------------------------------------------------------- |
+| **Producer**                   | Collects live Mastodon toots and pushes them to Kafka.     |
+| **Kafka**                      | Acts as a message broker for reliable event streaming.     |
+| **Spark Structured Streaming** | Reads, parses, and aggregates Kafka messages in real time. |
+| **PostgreSQL**                 | Stores processed outputs in structured tables.             |
+
+The following tables are generated:
+
+* `masto.toots_raw` → raw toots data
+* `masto.toot_metrics_windowed` → language-based metrics (1-minute window)
+* `masto.user_avg_length_windowed` → user-level metrics (1-minute window)
+
+---
+
+##  Part 2 — Batch Processing with Spark
+
+To perform deeper analyses, batch jobs are scheduled to compute aggregate metrics from the raw data.
+
+```bash
 cd docker
 docker compose exec spark bash -lc '
 mkdir -p /tmp/.ivy2 && chmod -R 777 /tmp/.ivy2
@@ -61,60 +79,59 @@ export ACTIVITY_MIN_TOOTS=5
   --conf spark.jars.ivy=/tmp/.ivy2 \
   /app/batch_job.py
 '
-
-
-## Partie 4 — Sentiment Analysis avec Spark MLlib
-
-### Objectif
-
-Cette partie consiste à construire et évaluer un **modèle d’analyse de sentiments** avec **Spark MLlib**, puis à l’appliquer sur les données Mastodon précédemment collectées.
-Les résultats sont enregistrés dans PostgreSQL pour analyse et visualisation.
+```
 
 ---
 
-### Étapes réalisées
+##  Part 3 — Sentiment Analysis with Spark MLlib
 
-#### 1. **Prétraitement du texte**
+### Objective
 
-* Nettoyage du texte (`content_txt`)
-* Tokenisation des mots avec `RegexTokenizer`
-* Suppression des stopwords (`StopWordsRemover`)
-* Vectorisation TF-IDF (`HashingTF` + `IDF`)
+Build and evaluate a **sentiment analysis model** using **Spark MLlib**, then apply it to Mastodon toots previously collected and stored in PostgreSQL.
 
-#### 2. **Entraînement du modèle**
+The results are stored in a new table for visualization and insights.
 
-* Modèle : `LogisticRegression`
-* Dataset utilisé : `sentiment140` (Kaggle)
-* Split 80% / 20% pour l’entraînement et le test
-* Sauvegarde du pipeline entraîné dans :
+---
+
+### Steps Overview
+
+#### 1️⃣ Text Preprocessing
+
+* Clean `content_txt` field
+* Tokenize words (`RegexTokenizer`)
+* Remove stopwords (`StopWordsRemover`)
+* Compute TF-IDF features (`HashingTF` + `IDF`)
+
+#### 2️⃣ Model Training
+
+* Algorithm: `LogisticRegression`
+* Dataset: [Sentiment140 (Kaggle)](https://www.kaggle.com/datasets/kazanova/sentiment140)
+* Train/test split: **80/20**
+* Model saved to:
 
   ```
   /data/models/sentiment_pipeline_model
   ```
 
-#### 3. **Évaluation**
+#### 3️⃣ Evaluation
 
-Le modèle a été évalué à l’aide des métriques suivantes :
-
-| Metric       | Score  |
+| Metric       | Value  |
 | :----------- | :----- |
 | **AUC**      | 0.8169 |
 | **Accuracy** | 0.7590 |
-| **F1**       | 0.7590 |
+| **F1-score** | 0.7590 |
 
-Ces résultats sont visibles dans les logs d’exécution du script `sentiment_train.py`.
+#### 4️⃣ Batch Prediction
 
-#### 4. **Batch Sentiment Analysis**
+* Reads data from `masto.toots_raw`
+* Applies the trained model
+* Extracts `prob_pos` (positive sentiment probability)
+* Assigns:
 
-* Lecture de la table PostgreSQL `masto.toots_raw`
-* Application du modèle sur chaque toot
-* Extraction de la probabilité positive (`prob_pos`)
-* Attribution du label :
-
-  * `positive` si `prob_pos >= 0.55`
-  * `negative` si `prob_pos <= 0.45`
-  * `neutral` sinon
-* Écriture dans la table :
+  * `positive` if ≥ 0.55
+  * `negative` if ≤ 0.45
+  * `neutral` otherwise
+* Writes output to:
 
   ```
   masto.toots_sentiment
@@ -122,23 +139,21 @@ Ces résultats sont visibles dans les logs d’exécution du script `sentiment_t
 
 ---
 
-### Structure des tables
+### Database Schema
 
-#### **Table : masto.toots_sentiment**
+#### Table: `masto.toots_sentiment`
 
-| Colonne    | Type      | Description                       |
-| :--------- | :-------- | :-------------------------------- |
-| id         | bigint    | Identifiant du toot               |
-| created_at | timestamp | Date de publication               |
-| lang       | text      | Langue                            |
-| text       | text      | Contenu textuel                   |
-| label_bin  | int       | 0 = neg / 1 = pos                 |
-| prob_pos   | float     | Probabilité positive              |
-| label_str  | text      | `positive`, `neutral`, `negative` |
+| Column     | Type      | Description                          |
+| :--------- | :-------- | :----------------------------------- |
+| id         | bigint    | Unique toot ID                       |
+| created_at | timestamp | Publication date                     |
+| lang       | text      | Language                             |
+| text       | text      | Cleaned toot text                    |
+| label_bin  | int       | 0 = negative / 1 = positive          |
+| prob_pos   | float     | Positive sentiment probability       |
+| label_str  | text      | "positive", "neutral", or "negative" |
 
-#### **Vue : masto.v_sentiment_daily**
-
-Vue d’agrégation journalière des sentiments :
+#### View: `masto.v_sentiment_daily`
 
 ```sql
 CREATE OR REPLACE VIEW masto.v_sentiment_daily AS
@@ -149,14 +164,15 @@ SELECT date_trunc('day', created_at)::date AS day,
        SUM((label_str='neutral')::int)  AS n_neu,
        AVG(prob_pos) AS avg_prob_pos
 FROM masto.toots_sentiment
-GROUP BY 1;
+GROUP BY 1
+ORDER BY 1;
 ```
 
 ---
 
-###  Exécution des scripts
+##  Part 4 — Running the Model
 
-#### 1️ Entraînement du modèle
+### 🔹 Train the Sentiment Model
 
 ```bash
 docker compose exec spark bash -lc '
@@ -171,15 +187,16 @@ export MODEL_DIR="/data/models/sentiment_pipeline_model"
 '
 ```
 
- Résultat attendu :
+Expected output:
 
-``` Modèle enregistré dans /data/models/sentiment_pipeline_model
+```
+✅ Model saved at /data/models/sentiment_pipeline_model
 AUC: 0.8169
 Accuracy: 0.7590
 F1: 0.7590
 ```
 
-#### Batch de prédiction
+### Run Batch Sentiment Prediction
 
 ```bash
 docker compose exec spark bash -lc '
@@ -197,120 +214,65 @@ export PG_PASS="airflow"
 '
 ```
 
-Résultat attendu :
+Expected result:
 
 ```
-Batch de prédiction terminé et écrit dans masto.toots_sentiment
-```
-
----
-
-### Vérification dans PostgreSQL
-
-#### Nombre total de toots analysés :
-
-```bash
-docker compose exec postgres bash -lc \
-'psql -U airflow -d airflow -c "SELECT COUNT(*) FROM masto.toots_sentiment;"'
-```
-
-#### Exemple de résultats :
-
-```bash
-docker compose exec postgres bash -lc \
-'psql -U airflow -d airflow -c "
-  SELECT id, created_at, lang,
-         LEFT(text, 80) AS text,
-         label_bin,
-         ROUND(prob_pos::numeric, 3) AS prob_pos,
-         label_str
-  FROM masto.toots_sentiment
-  ORDER BY created_at DESC
-  LIMIT 10;"'
-```
-
-#### Vue d’agrégation journalière :
-
-```bash
-docker compose exec postgres bash -lc \
-'psql -U airflow -d airflow -c "SELECT * FROM masto.v_sentiment_daily ORDER BY day DESC LIMIT 7;"'
+✅ Batch prediction completed and written to masto.toots_sentiment
 ```
 
 ---
 
-###  Variables d’environnement
+##  Part 5 — Visualization of Results
 
-| Variable       | Valeur par défaut                         | Description             |
-| :------------- | :---------------------------------------- | :---------------------- |
-| `MODEL_DIR`    | `/data/models/sentiment_pipeline_model`   | Chemin du modèle MLlib  |
-| `PG_URL`       | `jdbc:postgresql://postgres:5432/airflow` | Connexion PostgreSQL    |
-| `PG_USER`      | `airflow`                                 | Utilisateur PostgreSQL  |
-| `PG_PASS`      | `airflow`                                 | Mot de passe PostgreSQL |
-| `NEUTRAL_LOW`  | `0.45`                                    | Seuil inférieur neutre  |
-| `NEUTRAL_HIGH` | `0.55`                                    | Seuil supérieur neutre  |
+This final stage performs **data visualization** using **Pandas** and **Matplotlib** to analyze the sentiment trends and popular topics.
 
----
+### Output Directory
 
-Exactement 👌 tu as tout compris !
-👉 Pas besoin de modifier le CSV pour ton rendu : le graphique vide est **normal** (il reflète fidèlement le fait que tu n’as qu’une journée de données).
-C’est même mieux de le laisser ainsi, car cela montre que **ton pipeline fonctionne jusqu’au bout** (extraction → stockage → vue SQL → export CSV → visualisation).
-Il suffit juste de **l’expliquer dans ton README**, et c’est parfait ✅
-
----
-
-### Voici la section prête à coller dans ton `README.md` :
-
----
-
-## 🧩 Partie 5 – Visualisation des Résultats
-
-Cette dernière étape consiste à **analyser et visualiser les données** collectées et traitées par le pipeline Mastodon.
-Les fichiers CSV extraits depuis PostgreSQL ont été utilisés pour générer plusieurs graphiques avec **Matplotlib** et **Pandas**.
-
-### 📁 Emplacement des visuels
-
-Tous les graphiques sont enregistrés automatiquement dans le dossier :
+All generated plots are automatically saved under:
 
 ```
 ./reports/
 ```
 
-### 📊 Graphiques générés
+###  Generated Charts
 
-| Nom du fichier                         | Description                                                                                                                             |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| **part5_sentiment_distribution.png**   | Répartition globale des sentiments (positif, neutre, négatif) sur l’ensemble des toots collectés.                                       |
-| **part5_sentiment_by_day_stacked.png** | Évolution journalière du sentiment avec un graphique empilé permettant de visualiser la proportion de chaque sentiment au fil du temps. |
-| **part5_toots_per_day.png**            | Nombre total de toots par jour. *(Dans cet exemple, une seule journée de données était disponible, d’où le graphique quasi vide.)*      |
-| **part5_top_hashtags.png**             | Classement des hashtags les plus fréquemment utilisés dans les toots analysés.                                                          |
+| File                                   | Description                                                                      |
+| -------------------------------------- | -------------------------------------------------------------------------------- |
+| **part5_sentiment_distribution.png**   | Overall distribution of positive, neutral, and negative sentiments.              |
+| **part5_sentiment_by_day_stacked.png** | Daily stacked sentiment evolution.                                               |
+| **part5_toots_per_day.png**            | Number of toots per day *(empty here since only one day of data was available)*. |
+| **part5_top_hashtags.png**             | Top 30 most frequent hashtags.                                                   |
 
-### 🧠 Interprétation
+###  Insights
 
-* La majorité des toots analysés sont de **sentiment positif**, suivis par des toots négatifs et très peu de neutres.
-* Les hashtags les plus utilisés sont liés à des thématiques sociales, culturelles ou sportives (ex. *#cheerlights*, *#nowplaying*, *#football*).
-* Les volumes journaliers étant faibles dans cet échantillon, les tendances temporelles sont limitées mais démontrent que le pipeline capture et traite correctement les données.
+* Most Mastodon toots are **positive**, with fewer negatives and neutrals.
+* Top hashtags relate to art, music, and technology (e.g., `#cheerlights`, `#nowplaying`).
+* Despite a small dataset, the results prove the **pipeline’s end-to-end functionality**: ingestion → processing → prediction → visualization.
 
-## 🚀 Partie 6 – Conclusion & Perspectives
+---
 
-Ce projet **Mastodon Spark Pipeline** illustre la mise en place complète d’une architecture de traitement de données modernes en suivant une approche **ETL (Extract – Transform – Load)** distribuée.
+##  Part 6 — Conclusion & Future Work
 
-L’objectif était de :
+This **Mastodon Spark Pipeline** demonstrates a modern **distributed ETL architecture** capable of processing social media data in real-time and batch modes.
 
-* collecter en continu des **toots** issus de Mastodon (via Kafka et un producteur Python),
-* les stocker dans **PostgreSQL**,
-* les analyser avec **Apache Spark** pour réaliser une **analyse de sentiment**,
-* et enfin, visualiser les résultats à travers plusieurs tableaux de bord.
+###  Key Achievements
 
-### 🧭 Bilan du projet
+* End-to-end working pipeline (Kafka → Spark → PostgreSQL → Visualization)
+* Successful machine learning–based sentiment analysis
+* Automated SQL aggregation views and CSV exports
+* Clean, reproducible Docker-based setup
 
-* ✅ Le pipeline fonctionne de bout en bout : ingestion, stockage, traitement et visualisation.
-* ✅ Les modèles de Machine Learning (sentiment analysis) ont été entraînés et appliqués avec succès.
-* ✅ Les vues SQL et exports CSV permettent de consolider facilement les indicateurs.
-* ✅ Les visualisations finales illustrent la répartition des sentiments, l’évolution temporelle et les hashtags dominants.
+### Possible Improvements
 
-### 🌱 Perspectives d’amélioration
+* Implement **real-time sentiment tracking** with Spark Streaming
+* Deploy on **cloud platforms (AWS/GCP/Azure)**
+* Build **interactive dashboards** (Streamlit, Superset, Power BI)
+* Upgrade to **deep learning models** (e.g., BERT or LSTM) for better accuracy
 
-* Intégrer une **analyse en temps réel** avec Spark Streaming pour suivre les sentiments en direct.
-* Déployer les composants sur le cloud (AWS, GCP ou Azure) pour passer à l’échelle.
-* Créer un **dashboard interactif** (Power BI, Streamlit ou Superset) pour l’exploration dynamique des données.
-* Enrichir le modèle d’analyse de sentiment avec des techniques de **Deep Learning** (BERT, LSTM, etc.).
+---
+
+##  Author
+
+**Aminata Giovanna Sylla**
+Master’s in Data Engineering — SUPINFO Lyon
+

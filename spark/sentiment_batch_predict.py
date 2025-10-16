@@ -3,7 +3,7 @@
 import os
 from pyspark.sql import SparkSession, functions as F, types as T
 from pyspark.ml import PipelineModel
-from pyspark.ml.functions import vector_to_array  # évite l'UDF sur probability
+from pyspark.ml.functions import vector_to_array  
 
 MODEL_DIR = os.getenv("MODEL_DIR", "/data/models/sentiment_pipeline_model")
 PG_URL  = os.getenv("PG_URL",  "jdbc:postgresql://postgres:5432/airflow")
@@ -23,7 +23,6 @@ spark.sparkContext.setLogLevel("WARN")
 model = PipelineModel.load(MODEL_DIR)
 
 # 2) Charger l'historique Mastodon
-#    On prend username aussi pour enrichir l'analyse (si la colonne n'existe pas chez toi, enlève-la du select)
 toots = (spark.read
          .format("jdbc")
          .option("url", PG_URL)
@@ -50,7 +49,6 @@ label_str = (F.when(F.col("prob_pos") >= HIGH, F.lit("positive"))
                .otherwise(F.lit("neutral")))
 
 # 5) Choisir la colonne de prédiction binaire exposée par le pipeline
-#    (selon les versions, ça peut être 'prediction' ou déjà 'label')
 pred_col = "prediction" if "prediction" in scored2.columns else ("label" if "label" in scored2.columns else None)
 if pred_col is None:
     raise RuntimeError("Aucune colonne de prédiction trouvée (ni 'prediction' ni 'label').")
@@ -76,8 +74,8 @@ result = (scored2
    .option("password", PG_PASS)
    .option("driver", "org.postgresql.Driver")
    .option("dbtable", "masto.toots_sentiment_v2")
-   .mode("append")        # 'append' crée la table si elle n'existe pas, sinon ajoute
+   .mode("append")       
    .save())
 
-print("✅ Batch de prédiction terminé et écrit dans masto.toots_sentiment_v2")
+print("Batch de prédiction terminé et écrit dans masto.toots_sentiment_v2")
 spark.stop()
